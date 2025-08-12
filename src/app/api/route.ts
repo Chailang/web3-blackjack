@@ -1,5 +1,6 @@
 
 import { PlayerScore,getPlayerScore, putPlayerScore, updatePlayerScore } from '../dynamodb';
+import { verifyMessage } from "viem";
 
 const suits = ['♠️', '♥️', '♦️', '♣️']
 const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
@@ -169,16 +170,49 @@ export async function POST(request: Request) {
         } 
 
         // return if the action is not hit or stand
-        const { action } = await request.json()
+        const body = await request.json()
+        const { action, player } = body
+        
+        // verify if the signature is correct
+        if(action === "auth") {
+            console.log("Auth action received:", body)
+            const { signature, message } = body
+            try {
+                console.log("Verifying signature for address:", player)
+                const isValid = await verifyMessage({
+                    address: player,
+                    signature,
+                    message
+                })
+                if(isValid) {
+                    console.log("Signature is valid for player:", player)
+                    return new Response(JSON.stringify({"token": "valid_signature"}), {
+                        status: 200
+                    })
+                } else {
+                    return new Response(JSON.stringify({message: "Signature is invalid"}), {
+                        status: 400
+                    })
+                }
+            } catch (error) {
+                console.error("Signature verification error:", error)
+                return new Response(JSON.stringify({message: "Signature verification failed"}), {
+                    status: 400
+                })
+            }
+        }
+        
         if(action !== "hit" && action !== "stand") {
             return new Response(JSON.stringify({message: "Invalid action"}), {
                 status: 400
             })
         }
-        
+
         // hit: 21 - player wins black jack
         // hit: greater than 21 - player loses, bust
         // hit: less than 21 = continue, update the player hand
+
+        
         if(action === "hit") {
             
             const [newCard, newDeck] = getRandomCard(gameState.deck, 1)

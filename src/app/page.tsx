@@ -1,6 +1,9 @@
 "use client"
 import { use, useEffect, useState } from "react"
 import { Card } from "@/app/api/route"
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import '@rainbow-me/rainbowkit/styles.css';
+import { useAccount,useSignMessage } from 'wagmi';
 
 export default function Page() {
 
@@ -8,11 +11,17 @@ export default function Page() {
   const [playerHand, setPlayerHand] = useState<Card[]>([])
   const [dealerHand, setDealerHand] = useState<Card[]>([])
   const [score, setScore] = useState<number>(0)
+  const [signedIn, setSignedIn] = useState<boolean>(false) //是否已签名
+  const { isConnected, address } = useAccount()
+  const { signMessageAsync } = useSignMessage()
 
   //在组件里声明一个叫 deck 的状态变量，初始值是 initialDeck，并提供一个叫 setDeck 的函数，用来修改它。
   useEffect(() => {
-      setMessage("")
-      const initialGame = async () => {
+      // setMessage("")
+      // initialGame()
+  }, []);
+
+  const initialGame = async () => {
       try {
         const response = await fetch("/api", {
           method: "GET",
@@ -31,10 +40,6 @@ export default function Page() {
         setMessage("无法加载游戏，请重试。");
       }
     };
-      initialGame()
-  }, []);
-
-
   async function handleHit() {
     const response = await fetch("/api", {
       method: "POST",
@@ -71,8 +76,68 @@ export default function Page() {
     setMessage(message)
     setScore(score)
   }
+  async function handleSign() {
+    try {
+      if (!address) {
+        console.error("No wallet address available")
+        return
+      }
+      
+      const messageToSign = `Welcome to the 21 点 game at ${new Date().toString()}, please sign this message to prove you are the owner of the wallet.`
+      console.log("Signing message:", messageToSign)
+      
+      const signature = await signMessageAsync({
+        message: messageToSign
+      })
+      
+      console.log("Signature:", signature)
+      console.log("Address:", address)
+      
+      const requestBody = {
+        signature,
+        message: messageToSign,
+        player: address,
+        action: "auth"
+      }
+      
+      console.log("Request body:", requestBody)
+      
+      const response = await fetch("/api", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      })
+
+      console.log("Response status:", response.status)
+      
+      if(response.status === 200) {
+        console.log("Signature is valid")
+        const { token } = await response.json()
+        // localStorage.setItem("token", token)
+        setSignedIn(true)
+        setMessage("")
+        initialGame()
+      } else {
+        const errorData = await response.json()
+        console.error("Signature verification failed:", errorData)
+      }
+    } catch (error) {
+      console.error("Error in handleSign:", error)
+    }
+  }
+  if (!signedIn) {
+    return (
+      <div className="flex flex-col gap-4 items-center justify-center min-h-screen p-4 bg-green-100">
+          <ConnectButton />
+          <button onClick={handleSign} className="p-2 bg-amber-300 rounded-lg font-bold">签名</button>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col gap-4 items-center justify-center min-h-screen p-4 bg-green-100">
+      <ConnectButton />
       <h1 className="text-3xl font-bold">Welcome to the 21 点 游戏</h1>
       <h1 className="my-4 text-4xl bold">Score: {score}</h1>
       <h2 className={`text-2xl font-bold ${message.includes("win") ? "bg-yellow-100" : "bg-green-100"}`}>{message}</h2>
