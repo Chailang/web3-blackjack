@@ -16,14 +16,19 @@ export default function Page() {
   const { signMessageAsync } = useSignMessage()
 
   //在组件里声明一个叫 deck 的状态变量，初始值是 initialDeck，并提供一个叫 setDeck 的函数，用来修改它。
-  useEffect(() => {
-      // setMessage("")
-      // initialGame()
-  }, []);
+  // useEffect(() => {
+  //     setMessage("")
+  //     initialGame()
+  // }, []);
 
   const initialGame = async () => {
       try {
-        const response = await fetch("/api", {
+        if (!address) {
+          console.error("钱包地址不可用");
+          setMessage("请先连接钱包");
+          return;
+        }
+        const response = await fetch(`/api?player=${address}`, {
           method: "GET",
         });
         if (!response.ok) {
@@ -40,11 +45,20 @@ export default function Page() {
         setMessage("无法加载游戏，请重试。");
       }
     };
-  async function handleHit() {
-    const response = await fetch("/api", {
-      method: "POST",
-      body: JSON.stringify({action: "hit"})
-    })
+      async function handleHit() {
+      if (!address) {
+        console.error("钱包地址不可用");
+        setMessage("请先连接钱包");
+        return;
+      }
+      const response = await fetch("/api", {
+        //发送请求时携带 token
+        headers: {
+          authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+        method: "POST",
+        body: JSON.stringify({action: "hit", player: address})
+      })
     const { playerHand, dealerHand, message, score } = await response.json()
     setPlayerHand(playerHand)
     setDealerHand(dealerHand)
@@ -53,11 +67,20 @@ export default function Page() {
 
   }
 
-  async function handleStand() {
+    async function handleStand() {
+    if (!address) {
+      console.error("钱包地址不可用");
+      setMessage("请先连接钱包");
+      return;
+    }
     const response = await fetch("/api", {
-      method: "POST",
-      body: JSON.stringify({action: "stand"})
-    })
+       //发送请求时携带 token
+       headers: {
+         authorization: `Bearer ${localStorage.getItem("token")}`,
+       },
+       method: "POST",
+       body: JSON.stringify({action: "stand", player: address})
+     })
     const { playerHand, dealerHand, message, score } = await response.json()
     setPlayerHand(playerHand)
     setDealerHand(dealerHand)
@@ -66,8 +89,16 @@ export default function Page() {
   }
 
   async function handleReset() {
-    const response = await fetch("/api", {
+    if (!address) {
+      console.error("钱包地址不可用");
+      setMessage("请先连接钱包");
+      return;
+    }
+    const response = await fetch(`/api?player=${address}`, {
       method: "GET",
+      headers: {
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
     })
 
     const { playerHand, dealerHand, message, score } = await response.json()
@@ -114,8 +145,11 @@ export default function Page() {
       
       if(response.status === 200) {
         console.log("Signature is valid")
-        const { token } = await response.json()
-        // localStorage.setItem("token", token)
+        const { token } = await response.json() //签名成功，返回一个 token
+        console.log("Token received:", token)
+        // 将 token 存储在 localStorage 中
+        // 这里可以根据需要存储 token，例如用于后续的 API 请求验证
+        localStorage.setItem("token", token)
         setSignedIn(true)
         setMessage("")
         initialGame()

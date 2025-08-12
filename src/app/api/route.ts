@@ -1,11 +1,21 @@
 
 import { PlayerScore,getPlayerScore, putPlayerScore, updatePlayerScore } from '../dynamodb';
 import { verifyMessage } from "viem";
+import jwt from "jsonwebtoken";
+
+// 获取JWT密钥，如果没有环境变量则使用默认值（仅用于开发）
+const getJwtSecret = () => {
+    if (process.env.JWT_SECRET) {
+        return process.env.JWT_SECRET;
+    }
+    // 开发环境默认密钥 - 在生产环境中应该设置环境变量
+    console.warn("Warning: Using default JWT secret. Please set JWT_SECRET environment variable for production.");
+    return "dev-jwt-secret-key-change-in-production";
+};
 
 const suits = ['♠️', '♥️', '♦️', '♣️']
 const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 const initialDeck = suits.map(suit => ranks.map(rank => ({suit: suit, rank: rank}))).flat()
-const defaultPlayer = "defaultPlayer"
 export interface Card {
   suit: string;
   rank: string;
@@ -60,7 +70,13 @@ function getRandomCard(deck: Card[], noOfCards: number): [Card[], Card[]] {
     return [randomCards, newDeck]
 }
 
-export async function GET() {
+export async function GET(request: Request) { //请求玩家得分接口
+    const url = new URL(request.url)
+    const player = url.searchParams.get("player")
+    if(!player) {
+        return new Response(JSON.stringify({message: "Player is required", error: "Missing player parameter in query string"}), {
+            status: 400 
+    })}
     gameState.deck = [...initialDeck] 
     gameState.dealerHand = []
     gameState.playerHand = []
@@ -73,7 +89,7 @@ export async function GET() {
     gameState.deck = deckAfterPlayer //当前剩余的牌
 
     try {
-        const response = await getPlayerScore(defaultPlayer)
+        const response = await getPlayerScore(player)
         console.log("response", response)
         if(!response) {
             gameState.score = 0
@@ -173,7 +189,14 @@ export async function POST(request: Request) {
         const body = await request.json()
         const { action, player } = body
         
-        // verify if the signature is correct
+        // 验证player参数是否存在
+        if (!player) {
+            return new Response(JSON.stringify({message: "Player is required", error: "Missing player parameter in request body"}), {
+                status: 400
+            })
+        }
+        
+        // verify if the signature is correct 
         if(action === "auth") {
             console.log("Auth action received:", body)
             const { signature, message } = body
@@ -186,7 +209,11 @@ export async function POST(request: Request) {
                 })
                 if(isValid) {
                     console.log("Signature is valid for player:", player)
-                    return new Response(JSON.stringify({"token": "valid_signature"}), {
+                    // 签名验证成功，生成 JWT token
+                    const jwtToken = jwt.sign({player}, getJwtSecret(), {expiresIn: "1h"})    
+                    // 返回 token
+                    console.log("JWT Token generated:", jwtToken)
+                    return new Response(JSON.stringify({"token": jwtToken}), {
                         status: 200
                     })
                 } else {
@@ -202,17 +229,29 @@ export async function POST(request: Request) {
             }
         }
         
+        // 验证请求头中的 Bearer token
+        const authHeader = request.headers.get("authorization")
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return new Response(JSON.stringify({message: "Authorization header is missing or invalid"}), {
+                status: 401
+            })
+        }
+        const jwtToken = authHeader.split(" ")[1]
+        const decoded = jwt.verify(jwtToken, getJwtSecret()) as {player: string}
+        if(decoded.player.toLocaleLowerCase() !== player.toLocaleLowerCase()) {
+            return new Response(JSON.stringify({message: "Unauthorized"}), {
+                status: 401
+            })
+        }
+        console.log("Player authenticated:", decoded.player, "player:", player)
         if(action !== "hit" && action !== "stand") {
             return new Response(JSON.stringify({message: "Invalid action"}), {
                 status: 400
             })
         }
-
         // hit: 21 - player wins black jack
         // hit: greater than 21 - player loses, bust
         // hit: less than 21 = continue, update the player hand
-
-        
         if(action === "hit") {
             
             const [newCard, newDeck] = getRandomCard(gameState.deck, 1)
@@ -267,7 +306,7 @@ export async function POST(request: Request) {
         }
 
         try {
-            await updatePlayerScore(defaultPlayer, gameState.score)
+            await updatePlayerScore(player, gameState.score)
         } catch (error) {
             console.error("更新玩家分数失败:", error)
             // 继续执行，不中断游戏流程
