@@ -1,6 +1,6 @@
 "use client"
 import { use, useEffect, useState } from "react"
-import { Card } from "@/api/route"
+import { Card } from "@/app/api/route"
 // import { Card } from "./api/route"
 // import { Card } from "./api/route.ts";
 
@@ -52,7 +52,7 @@ export default function Page() {
   }
 
   async function handleStand() {
-    const response = await fetch("api", {
+    const response = await fetch("/api", {
       method: "POST",
       body: JSON.stringify({action: "stand"})
     })
@@ -64,7 +64,7 @@ export default function Page() {
   }
 
   async function handleReset() {
-    const response = await fetch("api", {
+    const response = await fetch("/api", {
       method: "GET",
     })
 
@@ -81,7 +81,7 @@ export default function Page() {
       <h2 className={`text-2xl font-bold ${message.includes("win") ? "bg-yellow-100" : "bg-green-100"}`}>{message}</h2>
       {/* 庄家 */}
       <div>
-        <h2 className="text-2xl font-bold mb-2">庄家</h2>
+        <h2 className="text-2xl font-bold mb-2 items-center">庄家</h2>
         <div className="flex flex-row gap-2">
           { dealerHand.length === 0 ? <>暂无手牌</> :dealerHand.map((card, index) => (
             <div key={index} className="w-32 h-48 border border-black bg-green-200 rounded-md flex flex-col justify-between">
