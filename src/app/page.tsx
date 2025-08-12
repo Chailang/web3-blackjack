@@ -1,8 +1,6 @@
 "use client"
 import { use, useEffect, useState } from "react"
 import { Card } from "@/app/api/route"
-// import { Card } from "./api/route"
-// import { Card } from "./api/route.ts";
 
 export default function Page() {
 
@@ -10,7 +8,6 @@ export default function Page() {
   const [playerHand, setPlayerHand] = useState<Card[]>([])
   const [dealerHand, setDealerHand] = useState<Card[]>([])
   const [score, setScore] = useState<number>(0)
-
 
   //在组件里声明一个叫 deck 的状态变量，初始值是 initialDeck，并提供一个叫 setDeck 的函数，用来修改它。
   useEffect(() => {
@@ -76,12 +73,12 @@ export default function Page() {
   }
   return (
     <div className="flex flex-col gap-4 items-center justify-center min-h-screen p-4 bg-green-100">
-      <h1 className="text-3xl font-bold">Welcome to the 21 点游戏  App</h1>
+      <h1 className="text-3xl font-bold">Welcome to the 21 点 游戏</h1>
       <h1 className="my-4 text-4xl bold">Score: {score}</h1>
       <h2 className={`text-2xl font-bold ${message.includes("win") ? "bg-yellow-100" : "bg-green-100"}`}>{message}</h2>
       {/* 庄家 */}
       <div>
-        <h2 className="text-2xl font-bold mb-2 items-center">庄家</h2>
+        <h2 className="text-2xl font-bold mb-2 text-center">庄家</h2>
         <div className="flex flex-row gap-2">
           { dealerHand.length === 0 ? <>暂无手牌</> :dealerHand.map((card, index) => (
             <div key={index} className="w-32 h-48 border border-black bg-green-200 rounded-md flex flex-col justify-between">
@@ -95,7 +92,7 @@ export default function Page() {
 
      {/* 玩家 */}
       <div>
-        <h2 className="text-2xl font-bold mb-2">玩家</h2>
+        <h2 className="text-2xl font-bold mb-2 text-center">玩家</h2>
         <div className="flex flex-row gap-2 mt-2">
            {playerHand.length === 0 ? <></> : playerHand.map((card, index) => (
             <div key={index} className="w-32 h-48 border border-black bg-yellow-100 rounded-md flex flex-col justify-between">

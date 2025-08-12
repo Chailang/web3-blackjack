@@ -1,9 +1,10 @@
-import { get } from "http";
+
+import { PlayerScore,getPlayerScore, putPlayerScore, updatePlayerScore } from '../dynamodb';
 
 const suits = ['♠️', '♥️', '♦️', '♣️']
 const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 const initialDeck = suits.map(suit => ranks.map(rank => ({suit: suit, rank: rank}))).flat()
-
+const defaultPlayer = "defaultPlayer"
 export interface Card {
   suit: string;
   rank: string;
@@ -69,11 +70,26 @@ export async function GET() {
     gameState.dealerHand = dealerHand
     gameState.playerHand = playerHand
     gameState.deck = deckAfterPlayer //当前剩余的牌
+
+    try {
+        const response = await getPlayerScore(defaultPlayer)
+        console.log("response", response)
+        if(!response) {
+            gameState.score = 0
+        } else {
+            gameState.score = response.score
+        }
+    } catch (error) {
+        console.error("获取玩家分数失败:", error)
+        gameState.score = 0
+    }
+
     return new Response(JSON.stringify({
         playerHand: gameState.playerHand,
         dealerHand: [gameState.dealerHand[0], {suit: "?", rank: "?"}], //只显示庄家的第一张牌
         deck: gameState.deck,
-        message:gameState.message
+        message: gameState.message,
+        score: gameState.score
     }),{
         status: 200
     })
@@ -171,11 +187,11 @@ export async function POST(request: Request) {
 
             const playerValue = calculateHandValue(gameState.playerHand)
             if(playerValue > 21) {
-                gameState.message = "You lose! busts!"
+                gameState.message = "你输了! 爆点了!"
                 gameState.score -= 100
             }
             else if(playerValue === 21) {
-                gameState.message = "You win! Black Jack!"
+                gameState.message = "你赢了! 庄家爆点了!"
                 gameState.score += 100
             }
         }
@@ -214,6 +230,13 @@ export async function POST(request: Request) {
                     gameState.message = "Draw!"
                 }
             }
+        }
+
+        try {
+            await updatePlayerScore(defaultPlayer, gameState.score)
+        } catch (error) {
+            console.error("更新玩家分数失败:", error)
+            // 继续执行，不中断游戏流程
         }
 
         return new Response(JSON.stringify(
