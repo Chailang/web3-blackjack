@@ -2,5 +2,5 @@
 const nextConfig = {
     transpilePackages: ['debug'],
 }
-
-module.exports = nextConfig
+// module.exports = nextConfig
+export default nextConfig
