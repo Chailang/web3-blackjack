@@ -173,8 +173,8 @@ export default function Page() {
     <div className="flex flex-col gap-4 items-center justify-center min-h-screen p-4 bg-green-100">
       <ConnectButton />
       <h1 className="text-3xl font-bold">Welcome to the 21 点 游戏</h1>
-      <h1 className="my-4 text-4xl bold">Score: {score}</h1>
-      <h2 className={`text-2xl font-bold ${message.includes("win") ? "bg-yellow-100" : "bg-green-100"}`}>{message}</h2>
+      <h1 className="my-4 text-4xl bold">游戏得分 Score: {score}</h1>
+      <h2 className={`text-2xl font-bold ${message.includes("win") ? "bg-green-200" : "bg-red-300"}`}>{message}</h2>
       {/* 庄家 */}
       <div>
         <h2 className="text-2xl font-bold mb-2 text-center">庄家</h2>
