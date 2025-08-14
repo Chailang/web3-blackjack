@@ -1,10 +1,10 @@
 import { cookieStorage, createConfig, createStorage, http } from 'wagmi'
-import { mainnet, sepolia } from 'wagmi/chains'
+import { mainnet, sepolia , avalancheFuji} from 'wagmi/chains'
 import { baseAccount, injected, walletConnect } from 'wagmi/connectors'
 
 export function getConfig() {
   return createConfig({
-    chains: [mainnet, sepolia],
+    chains: [mainnet, sepolia,avalancheFuji],
     connectors: [
       injected(),
       baseAccount(),
@@ -17,6 +17,7 @@ export function getConfig() {
     transports: {
       [mainnet.id]: http(),
       [sepolia.id]: http(),
+      [avalancheFuji.id]: http(),
     },
   })
 }

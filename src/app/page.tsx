@@ -4,6 +4,8 @@ import { Card } from "@/app/api/route"
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import '@rainbow-me/rainbowkit/styles.css';
 import { useAccount,useSignMessage } from 'wagmi';
+import { parseAbi,createWalletClient, createPublicClient,custom} from "viem";
+import { sepolia } from "viem/chains";
 
 export default function Page() {
 
@@ -14,12 +16,34 @@ export default function Page() {
   const [signedIn, setSignedIn] = useState<boolean>(false) //是否已签名
   const { isConnected, address } = useAccount()
   const { signMessageAsync } = useSignMessage()
-
+  const [publicClient, setPublicClient] = useState<any>(null);
+  const [walletClient, setWalletClient] = useState<any>(null);
   //在组件里声明一个叫 deck 的状态变量，初始值是 initialDeck，并提供一个叫 setDeck 的函数，用来修改它。
-  // useEffect(() => {
-  //     setMessage("")
-  //     initialGame()
-  // }, []);
+  useEffect(() => {
+
+    /**
+     * typeof window !== "undefined" → 确保代码在浏览器环境中执行（不是 Node.js 服务器端）。
+     * window.ethereum → MetaMask（或其他 EIP-1193 钱包扩展）会在浏览器注入的对象，如果存在说明用户安装了钱包。
+    * createWalletClient & createPublicClient → viem 提供的函数，用于创建与区块链交互的客户端实例。
+    * wallet client → 用来发交易（签名、调用合约写入函数）
+    * public client → 用来读链上数据（调用 view/pure 函数、获取区块等）
+    */
+    if (typeof window !== "undefined" && window.ethereum) {
+      const wallet = createWalletClient({
+        chain: sepolia,
+        transport: custom(window.ethereum)
+      })
+      const publicC = createPublicClient({
+        chain: sepolia,
+        transport: custom(window.ethereum)
+      })
+      setWalletClient(() => wallet)
+      setPublicClient(() => publicC)
+    } else {
+      console.error("MetaMask or window.ethereum is not available")
+    }  
+
+  }, []);
 
   const initialGame = async () => {
       try {
@@ -44,21 +68,22 @@ export default function Page() {
         console.error("初始化游戏失败：", error);
         setMessage("无法加载游戏，请重试。");
       }
-    };
-      async function handleHit() {
-      if (!address) {
-        console.error("钱包地址不可用");
-        setMessage("请先连接钱包");
-        return;
-      }
-      const response = await fetch("/api", {
-        //发送请求时携带 token
-        headers: {
-          authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        method: "POST",
-        body: JSON.stringify({action: "hit", player: address})
-      })
+  };
+
+  async function handleHit() {
+    if (!address) {
+      console.error("钱包地址不可用");
+      setMessage("请先连接钱包");
+      return;
+    }
+    const response = await fetch("/api", {
+      //发送请求时携带 token
+      headers: {
+        authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      method: "POST",
+      body: JSON.stringify({action: "hit", player: address})
+    })
     const { playerHand, dealerHand, message, score } = await response.json()
     setPlayerHand(playerHand)
     setDealerHand(dealerHand)
@@ -67,7 +92,7 @@ export default function Page() {
 
   }
 
-    async function handleStand() {
+  async function handleStand() {
     if (!address) {
       console.error("钱包地址不可用");
       setMessage("请先连接钱包");
@@ -106,6 +131,57 @@ export default function Page() {
     setDealerHand(dealerHand)
     setMessage(message)
     setScore(score)
+  }
+  async function handleSendTx() {
+    // 这里可以添加发送交易的逻辑
+    // 获取合约地址
+    const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+    // 获取合约ABI
+    const contractABI =  parseAbi([process.env.NEXT_PUBLIC_CONTRACT_ABI || ""]);
+    // publicClient - 模拟交易
+    // walletClient - 真正交易
+    if (!publicClient || !walletClient) {
+      console.error("Public client or wallet client is not initialized");
+      return;
+    }
+   
+    /**
+     * simulateContract = 本地 dry-run，检查会不会成功，预估 gas。
+     * writeContract = 真实交易，消耗 gas，打进区块。
+     * 正确姿势一般是 先 simulateContract → 再用 simulation.request 去 writeContract。
+     * simulateContract() → “演练一下，不花钱，看会不会翻车”
+     *  writeContract() → “真的上路开车，花油钱”
+    */
+    const simulation = publicClient.simulateContract({
+      address: contractAddress,
+      abi: contractABI,
+      functionName: "sendRequest",
+      args: [[address], address], 
+      account: address
+    });
+
+    // 打印整个 simulation 对象
+    console.log("Simulation result:", simulation);
+    // 分开打印关键字段
+    console.log("预估 Gas:", simulation.request.gas);
+    console.log("返回值:", simulation.result);
+    console.log("模拟生成的 request 对象:", simulation.request);
+
+    const txHash = await walletClient.writeContract({
+      address: contractAddress,
+      abi: contractABI,
+      functionName: "sendRequest",
+      args: [[address], address], 
+      account: address
+    });
+    console.log("Transaction hash:", txHash);
+    // 这里可以添加处理交易结果的逻辑
+    // 例如，监听交易确认、更新状态等
+    // 注意：确保在调用此函数之前，已经连接了钱包并且有足够的余额来支付交易费用
+    console.log("Transaction sent successfully");
+    setMessage("交易已发送，请等待确认"); 
+
+
   }
   async function handleSign() {
     try {
@@ -174,6 +250,7 @@ export default function Page() {
       <ConnectButton />
       <h1 className="text-3xl font-bold">Welcome to the 21 点 游戏</h1>
       <h1 className="my-4 text-4xl bold">游戏得分 Score: {score}</h1>
+      <button onClick={handleSendTx} className="p-2 bg-amber-300 rounded-lg font-bold">get NFT</button>
       <h2 className={`text-2xl font-bold ${message.includes("win") ? "bg-green-200" : "bg-red-300"}`}>{message}</h2>
       {/* 庄家 */}
       <div>
